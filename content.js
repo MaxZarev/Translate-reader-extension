@@ -211,6 +211,9 @@ function handleKeyPress(event) {
   if (event.key === 'ArrowRight') {
     event.preventDefault(); // Предотвращаем стандартное поведение (например, прокрутку)
     
+    // Скрываем окно перевода при навигации
+    hideTranslationPopup();
+    
     if (event.shiftKey) {
       // Shift + стрелка вправо - расширяем выделение
       expandSelectionRight();
@@ -223,6 +226,9 @@ function handleKeyPress(event) {
   // Стрелка влево - предыдущее слово
   else if (event.key === 'ArrowLeft') {
     event.preventDefault(); // Предотвращаем стандартное поведение
+    
+    // Скрываем окно перевода при навигации
+    hideTranslationPopup();
     
     if (event.shiftKey) {
       // Shift + стрелка влево - расширяем выделение
@@ -241,6 +247,7 @@ function handleKeyPress(event) {
   // Escape - очистить выделение
   else if (event.key === 'Escape') {
     event.preventDefault();
+    hideTranslationPopup();
     clearSelection();
     highlightCurrentToken();
   }
@@ -450,7 +457,7 @@ function getVisibility(rect) {
 function toggleTranslation() {
   // Если перевод уже отображается, скрываем его
   if (translationPopup.style.display === 'block') {
-    translationPopup.style.display = 'none';
+    hideTranslationPopup();
     return;
   }
   
@@ -706,4 +713,9 @@ function getSelectedText() {
   }
   
   return selectedTokens.join(' ');
+}
+
+// Скрыть окно перевода
+function hideTranslationPopup() {
+  translationPopup.style.display = 'none';
 } 
