@@ -1,5 +1,9 @@
 // Фоновый скрипт для расширения Translate Reader
 
+// Информация о расширении
+const EXTENSION_VERSION = '2.0.0';
+const EXTENSION_REPO = 'https://github.com/MaxZarev/translate-reader-extension';
+
 // API ключ будет загружаться из настроек
 let API_KEY = '';
 
@@ -7,7 +11,7 @@ let API_KEY = '';
 const translationCache = {};
 
 // Логирование запуска расширения
-console.log('Translate Reader: Фоновый скрипт инициализирован');
+console.log(`Translate Reader v${EXTENSION_VERSION}: Фоновый скрипт инициализирован`);
 
 // Загружаем API ключ из настроек при запуске
 loadApiKey();

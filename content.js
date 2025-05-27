@@ -1,3 +1,7 @@
+// Информация о расширении
+const EXTENSION_VERSION = '2.0.0';
+const EXTENSION_REPO = 'https://github.com/MaxZarev/translate-reader-extension';
+
 // Основные переменные
 let articleText = null;       // Основной текст страницы
 let tokenizedText = [];       // Текст, разбитый на токены (слова/выражения)
@@ -103,7 +107,7 @@ function initializeReader() {
       lastContentHash = simpleHash(articleText.textContent);
       
       initialized = true;
-      console.log('Translate Reader: Инициализация завершена');
+      console.log(`Translate Reader v${EXTENSION_VERSION}: Инициализация завершена`);
     } else {
       console.log('Translate Reader: Не удалось найти основной текст');
     }
