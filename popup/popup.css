@@ -1,0 +1,109 @@
+/* Стили для всплывающего окна настроек */
+
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+  color: #333;
+  background-color: #f8f9fa;
+}
+
+.container {
+  width: 300px;
+  padding: 15px;
+}
+
+h1 {
+  font-size: 18px;
+  margin: 0 0 15px;
+  color: #4285f4;
+  text-align: center;
+}
+
+h2 {
+  font-size: 14px;
+  margin: 0 0 10px;
+  color: #5f6368;
+}
+
+.settings-group {
+  background-color: #fff;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 15px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.setting {
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.setting label {
+  font-size: 14px;
+}
+
+.setting select,
+.setting input[type="color"] {
+  width: 120px;
+  padding: 5px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.setting input[type="range"] {
+  width: 100px;
+}
+
+.setting.checkbox {
+  justify-content: flex-start;
+}
+
+.setting.checkbox input {
+  margin-right: 10px;
+}
+
+.instructions {
+  background-color: #fff;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 15px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.instructions ul {
+  padding-left: 20px;
+  margin: 0;
+}
+
+.instructions li {
+  font-size: 13px;
+  margin-bottom: 5px;
+}
+
+.footer {
+  text-align: center;
+}
+
+button {
+  background-color: #4285f4;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+button:hover {
+  background-color: #3367d6;
+}
+
+#opacity-value {
+  font-size: 12px;
+  min-width: 25px;
+  text-align: right;
+} 
