@@ -2,6 +2,8 @@
 let articleText = null;       // Основной текст страницы
 let tokenizedText = [];       // Текст, разбитый на токены (слова/выражения)
 let currentTokenIndex = -1;   // Индекс текущего выделенного токена
+let selectionStartIndex = -1; // Начальный индекс выделения (для множественного выделения)
+let selectionEndIndex = -1;   // Конечный индекс выделения
 let highlightOverlay = null;  // Элемент подсветки
 let translationPopup = null;  // Всплывающее окно с переводом
 let initialized = false;      // Флаг инициализации
@@ -208,17 +210,39 @@ function handleKeyPress(event) {
   // Стрелка вправо - следующее слово
   if (event.key === 'ArrowRight') {
     event.preventDefault(); // Предотвращаем стандартное поведение (например, прокрутку)
-    highlightNextToken();
+    
+    if (event.shiftKey) {
+      // Shift + стрелка вправо - расширяем выделение
+      expandSelectionRight();
+    } else {
+      // Обычная стрелка вправо - переходим к следующему слову
+      clearSelection();
+      highlightNextToken();
+    }
   }
   // Стрелка влево - предыдущее слово
   else if (event.key === 'ArrowLeft') {
     event.preventDefault(); // Предотвращаем стандартное поведение
-    highlightPreviousToken();
+    
+    if (event.shiftKey) {
+      // Shift + стрелка влево - расширяем выделение
+      expandSelectionLeft();
+    } else {
+      // Обычная стрелка влево - переходим к предыдущему слову
+      clearSelection();
+      highlightPreviousToken();
+    }
   }
   // T - показать/скрыть перевод
   else if (event.key === 't' || event.key === 'T') {
     event.preventDefault(); // Предотвращаем стандартное поведение (например, открытие новой вкладки)
     toggleTranslation();
+  }
+  // Escape - очистить выделение
+  else if (event.key === 'Escape') {
+    event.preventDefault();
+    clearSelection();
+    highlightCurrentToken();
   }
 }
 
@@ -295,6 +319,9 @@ function highlightCurrentToken() {
         highlightOverlay.style.height = `${rect.height}px`;
         highlightOverlay.style.display = 'block';
         
+        // Убираем класс множественного выделения для одного слова
+        highlightOverlay.classList.remove('multi-selection');
+        
         // Всегда прокручиваем страницу так, чтобы слово было в центре экрана
         scrollToElement(rect);
         
@@ -321,13 +348,20 @@ function highlightCurrentToken() {
       
       const rect = range.getBoundingClientRect();
       
-      highlightOverlay.style.left = `${rect.left + window.scrollX}px`;
-      highlightOverlay.style.top = `${rect.top + window.scrollY}px`;
-      highlightOverlay.style.width = `${rect.width}px`;
-      highlightOverlay.style.height = `${rect.height}px`;
-      highlightOverlay.style.display = 'block';
-      
-      scrollToElement(rect);
+              highlightOverlay.style.left = `${rect.left + window.scrollX}px`;
+        highlightOverlay.style.top = `${rect.top + window.scrollY}px`;
+        highlightOverlay.style.width = `${rect.width}px`;
+        highlightOverlay.style.height = `${rect.height}px`;
+        highlightOverlay.style.display = 'block';
+        
+        // Добавляем класс для множественного выделения
+        if (hasSelection()) {
+          highlightOverlay.classList.add('multi-selection');
+        } else {
+          highlightOverlay.classList.remove('multi-selection');
+        }
+        
+        scrollToElement(rect);
       
       // Обновляем текущий индекс токена
       const nearestToken = findNearestToken(fallbackOffset);
@@ -414,21 +448,25 @@ function getVisibility(rect) {
 
 // Показать/скрыть перевод
 function toggleTranslation() {
-  if (currentTokenIndex === -1 || !tokenizedText[currentTokenIndex]) return;
-  
-  const token = tokenizedText[currentTokenIndex];
-  
   // Если перевод уже отображается, скрываем его
   if (translationPopup.style.display === 'block') {
     translationPopup.style.display = 'none';
     return;
   }
   
-  // Получаем перевод слова
-  getTranslation(token.text).then(translation => {
+  // Получаем текст для перевода (выделенный текст или текущее слово)
+  const textToTranslate = getSelectedText();
+  
+  if (!textToTranslate) {
+    console.log('Translate Reader: Нет текста для перевода');
+    return;
+  }
+  
+  // Получаем перевод текста
+  getTranslation(textToTranslate).then(translation => {
     // Устанавливаем текст перевода
     translationPopup.innerHTML = `
-      <div><b>${token.text}</b></div>
+      <div><b>${textToTranslate}</b></div>
       <div>${translation}</div>
     `;
     
@@ -523,4 +561,149 @@ async function getTranslation(word) {
       resolve('Ошибка запроса перевода');
     }
   });
+}
+
+// Расширение выделения вправо
+function expandSelectionRight() {
+  if (tokenizedText.length === 0) return;
+  
+  // Если выделение еще не начато, начинаем с текущего токена
+  if (selectionStartIndex === -1) {
+    if (currentTokenIndex === -1) {
+      currentTokenIndex = 0;
+    }
+    selectionStartIndex = currentTokenIndex;
+    selectionEndIndex = currentTokenIndex;
+  }
+  
+  // Расширяем выделение вправо
+  selectionEndIndex = Math.min(selectionEndIndex + 1, tokenizedText.length - 1);
+  currentTokenIndex = selectionEndIndex;
+  
+  highlightSelection();
+}
+
+// Расширение выделения влево
+function expandSelectionLeft() {
+  if (tokenizedText.length === 0) return;
+  
+  // Если выделение еще не начато, начинаем с текущего токена
+  if (selectionStartIndex === -1) {
+    if (currentTokenIndex === -1) {
+      currentTokenIndex = 0;
+    }
+    selectionStartIndex = currentTokenIndex;
+    selectionEndIndex = currentTokenIndex;
+  }
+  
+  // Расширяем выделение влево
+  selectionStartIndex = Math.max(selectionStartIndex - 1, 0);
+  currentTokenIndex = selectionStartIndex;
+  
+  highlightSelection();
+}
+
+// Очистка выделения
+function clearSelection() {
+  selectionStartIndex = -1;
+  selectionEndIndex = -1;
+}
+
+// Проверка, есть ли активное выделение
+function hasSelection() {
+  return selectionStartIndex !== -1 && selectionEndIndex !== -1 && selectionStartIndex !== selectionEndIndex;
+}
+
+// Подсветка выделенного диапазона
+function highlightSelection() {
+  if (!hasSelection()) {
+    highlightCurrentToken();
+    return;
+  }
+  
+  const startIndex = Math.min(selectionStartIndex, selectionEndIndex);
+  const endIndex = Math.max(selectionStartIndex, selectionEndIndex);
+  
+  // Находим текстовые узлы
+  const textNodes = [];
+  getTextNodes(articleText, textNodes);
+  
+  let currentTextLength = 0;
+  let startNode = null, endNode = null;
+  let startOffset = 0, endOffset = 0;
+  
+  // Ищем начальный и конечный узлы
+  for (const node of textNodes) {
+    const nodeTextLength = node.textContent.length;
+    
+    // Проверяем начальный токен
+    if (!startNode && tokenizedText[startIndex]) {
+      const startTokenIndex = tokenizedText[startIndex].index;
+      if (startTokenIndex >= currentTextLength && startTokenIndex < currentTextLength + nodeTextLength) {
+        startNode = node;
+        startOffset = startTokenIndex - currentTextLength;
+      }
+    }
+    
+    // Проверяем конечный токен
+    if (!endNode && tokenizedText[endIndex]) {
+      const endTokenIndex = tokenizedText[endIndex].index + tokenizedText[endIndex].text.length;
+      if (endTokenIndex > currentTextLength && endTokenIndex <= currentTextLength + nodeTextLength) {
+        endNode = node;
+        endOffset = endTokenIndex - currentTextLength;
+      }
+    }
+    
+    currentTextLength += nodeTextLength;
+    
+    if (startNode && endNode) break;
+  }
+  
+  if (startNode && endNode) {
+    try {
+      const range = document.createRange();
+      range.setStart(startNode, startOffset);
+      range.setEnd(endNode, endOffset);
+      
+      const rect = range.getBoundingClientRect();
+      
+      if (rect.width > 0 && rect.height > 0) {
+        highlightOverlay.style.left = `${rect.left + window.scrollX}px`;
+        highlightOverlay.style.top = `${rect.top + window.scrollY}px`;
+        highlightOverlay.style.width = `${rect.width}px`;
+        highlightOverlay.style.height = `${rect.height}px`;
+        highlightOverlay.style.display = 'block';
+        
+        scrollToElement(rect);
+      }
+    } catch (error) {
+      console.error('Translate Reader: Ошибка при выделении диапазона', error);
+      highlightCurrentToken();
+    }
+  } else {
+    highlightCurrentToken();
+  }
+}
+
+// Получение выделенного текста
+function getSelectedText() {
+  if (!hasSelection()) {
+    // Если нет выделения, возвращаем текущее слово
+    if (currentTokenIndex !== -1 && tokenizedText[currentTokenIndex]) {
+      return tokenizedText[currentTokenIndex].text;
+    }
+    return '';
+  }
+  
+  const startIndex = Math.min(selectionStartIndex, selectionEndIndex);
+  const endIndex = Math.max(selectionStartIndex, selectionEndIndex);
+  
+  const selectedTokens = [];
+  for (let i = startIndex; i <= endIndex; i++) {
+    if (tokenizedText[i]) {
+      selectedTokens.push(tokenizedText[i].text);
+    }
+  }
+  
+  return selectedTokens.join(' ');
 } 
