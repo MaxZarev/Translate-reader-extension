@@ -5,7 +5,8 @@ const defaultSettings = {
   targetLanguage: 'ru',
   highlightColor: '#FFFF00',
   highlightOpacity: 0.3,
-  autoTranslate: true
+  autoTranslate: true,
+  ctrlJumpWords: 5
 };
 
 // Элементы настроек
@@ -13,6 +14,7 @@ const targetLanguageSelect = document.getElementById('target-language');
 const highlightColorInput = document.getElementById('highlight-color');
 const highlightOpacityInput = document.getElementById('highlight-opacity');
 const opacityValueSpan = document.getElementById('opacity-value');
+const ctrlJumpWordsInput = document.getElementById('ctrl-jump-words');
 const autoTranslateCheckbox = document.getElementById('auto-translate');
 const saveButton = document.getElementById('save-btn');
 
@@ -27,6 +29,7 @@ document.addEventListener('DOMContentLoaded', () => {
     highlightColorInput.value = settings.highlightColor || defaultSettings.highlightColor;
     highlightOpacityInput.value = settings.highlightOpacity || defaultSettings.highlightOpacity;
     opacityValueSpan.textContent = settings.highlightOpacity || defaultSettings.highlightOpacity;
+    ctrlJumpWordsInput.value = settings.ctrlJumpWords || defaultSettings.ctrlJumpWords;
     autoTranslateCheckbox.checked = settings.autoTranslate !== undefined ? settings.autoTranslate : defaultSettings.autoTranslate;
   });
 });
@@ -43,6 +46,7 @@ saveButton.addEventListener('click', () => {
     targetLanguage: targetLanguageSelect.value,
     highlightColor: highlightColorInput.value,
     highlightOpacity: parseFloat(highlightOpacityInput.value),
+    ctrlJumpWords: parseInt(ctrlJumpWordsInput.value),
     autoTranslate: autoTranslateCheckbox.checked
   };
   

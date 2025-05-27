@@ -12,6 +12,7 @@ let navigationMode = 'word';  // Режим навигации: 'word', 'sentenc
 let highlightOverlay = null;  // Элемент подсветки
 let translationPopup = null;  // Всплывающее окно с переводом
 let initialized = false;      // Флаг инициализации
+let ctrlJumpWords = 5;        // Количество слов для прыжка с Ctrl+стрелки
 
 // Инициализация расширения при загрузке страницы
 function initOnLoad() {
@@ -50,6 +51,9 @@ function initializeReader() {
   if (initialized) return; // Предотвращаем повторную инициализацию
   
   console.log('Translate Reader: Инициализация...');
+  
+  // Загружаем настройки
+  loadSettings();
   
   // Ждем полной загрузки страницы
   setTimeout(() => {
@@ -223,7 +227,11 @@ function handleKeyPress(event) {
     // Скрываем окно перевода при навигации
     hideTranslationPopup();
     
-    if (event.shiftKey) {
+    if (event.ctrlKey || event.metaKey) {
+      // Ctrl/Cmd + стрелка вправо - прыжок на несколько слов вперед
+      clearSelection();
+      jumpWordsForward();
+    } else if (event.shiftKey) {
       // Shift + стрелка вправо - расширяем выделение
       expandSelectionRight();
     } else {
@@ -239,7 +247,11 @@ function handleKeyPress(event) {
     // Скрываем окно перевода при навигации
     hideTranslationPopup();
     
-    if (event.shiftKey) {
+    if (event.ctrlKey || event.metaKey) {
+      // Ctrl/Cmd + стрелка влево - прыжок на несколько слов назад
+      clearSelection();
+      jumpWordsBackward();
+    } else if (event.shiftKey) {
       // Shift + стрелка влево - расширяем выделение
       expandSelectionLeft();
     } else {
@@ -1107,4 +1119,53 @@ function findFirstTokenInSentence(sentence) {
     }
   }
   return -1;
+}
+
+// Прыжок на несколько слов вперед
+function jumpWordsForward() {
+  if (tokenizedText.length === 0) return;
+  
+  // Если текущий индекс не установлен, начинаем с первого слова
+  if (currentTokenIndex === -1) {
+    currentTokenIndex = 0;
+  } else {
+    // Прыгаем на заданное количество слов вперед
+    currentTokenIndex = Math.min(currentTokenIndex + ctrlJumpWords, tokenizedText.length - 1);
+  }
+  
+  highlightCurrentToken();
+}
+
+// Прыжок на несколько слов назад
+function jumpWordsBackward() {
+  if (tokenizedText.length === 0) return;
+  
+  // Если текущий индекс не установлен, начинаем с первого слова
+  if (currentTokenIndex === -1) {
+    currentTokenIndex = 0;
+  } else {
+    // Прыгаем на заданное количество слов назад
+    currentTokenIndex = Math.max(currentTokenIndex - ctrlJumpWords, 0);
+  }
+  
+  highlightCurrentToken();
+}
+
+// Загрузка настроек из хранилища
+function loadSettings() {
+  try {
+    chrome.storage.sync.get('settings', (data) => {
+      if (chrome.runtime.lastError) {
+        console.log('Translate Reader: Используем настройки по умолчанию');
+        return;
+      }
+      
+      const settings = data.settings || {};
+      ctrlJumpWords = settings.ctrlJumpWords || 5;
+      
+      console.log(`Translate Reader: Загружены настройки, прыжок на ${ctrlJumpWords} слов`);
+    });
+  } catch (error) {
+    console.log('Translate Reader: Ошибка загрузки настроек, используем значения по умолчанию');
+  }
 } 
