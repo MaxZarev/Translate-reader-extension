@@ -97,9 +97,6 @@ function initializeReader() {
       // Добавляем обработчики клавиатуры
       addKeyboardListeners();
       
-      // Создаем кнопку активации
-      createActivationButton();
-      
       // Запускаем наблюдение за изменениями DOM
       startDOMObserver();
       
@@ -114,22 +111,7 @@ function initializeReader() {
   }, 1000);
 }
 
-// Создание кнопки активации
-function createActivationButton() {
-  const button = document.createElement('div');
-  button.className = 'translate-reader-button';
-  button.textContent = 'TR';
-  button.title = 'Активировать Translate Reader';
-  
-  button.addEventListener('click', () => {
-    if (currentTokenIndex === -1 && tokenizedText.length > 0) {
-      currentTokenIndex = 0;
-      highlightCurrentToken();
-    }
-  });
-  
-  document.body.appendChild(button);
-}
+
 
 // Запуск наблюдения за изменениями DOM
 function startDOMObserver() {
@@ -1604,19 +1586,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         domObserver = null;
       }
       
-      // Скрываем кнопку активации
-      const activationButton = document.querySelector('.translate-reader-button');
-      if (activationButton) {
-        activationButton.style.display = 'none';
-      }
+
       
       console.log('Translate Reader: Расширение выключено');
     } else {
-      // Если расширение включается, показываем кнопку активации
-      const activationButton = document.querySelector('.translate-reader-button');
-      if (activationButton) {
-        activationButton.style.display = 'block';
-      }
+
       
       // Запускаем наблюдение за DOM, если оно не активно
       if (initialized && !domObserver) {
