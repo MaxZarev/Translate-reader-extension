@@ -1,0 +1,12 @@
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <!-- Фон -->
+  <rect width="128" height="128" rx="24" fill="#4285f4"/>
+  
+  <!-- Основной текст TR -->
+  <text x="64" y="80" font-family="Arial, sans-serif" font-size="48" font-weight="bold" 
+        text-anchor="middle" fill="#ffffff">TR</text>
+  
+  <!-- Маленькие стрелки -->
+  <path d="M30 45 L40 40 L40 50 Z" fill="#ffffff" opacity="0.6"/>
+  <path d="M98 45 L88 40 L88 50 Z" fill="#ffffff" opacity="0.6"/>
+</svg> 
