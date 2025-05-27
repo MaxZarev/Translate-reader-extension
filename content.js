@@ -428,15 +428,7 @@ function handleKeyPress(event) {
       toggleTranslation();
     }
   }
-  // Переключение режимов навигации
-  else if (event.key === '1') {
-    event.preventDefault();
-    switchNavigationMode('word');
-  }
-  else if (event.key === '2') {
-    event.preventDefault();
-    switchNavigationMode('sentence');
-  }
+
   // Переключение режимов навигации (backtick/ё для английской/русской раскладки)
   else if (event.key === '`' || event.key === '~' || event.key === 'ё' || event.key === 'Ё') {
     event.preventDefault();
