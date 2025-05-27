@@ -6,8 +6,8 @@ let sentences = [];           // Массив предложений
 let currentTokenIndex = -1;   // Индекс текущего выделенного токена
 let currentSentenceIndex = -1; // Индекс текущего предложения
 // Убрали индекс абзаца
-let selectionStartIndex = -1; // Начальный индекс выделения (для множественного выделения)
-let selectionEndIndex = -1;   // Конечный индекс выделения
+let selectionAnchorIndex = -1; // Фиксированная начальная точка выделения
+let selectionEndIndex = -1;    // Конечный индекс выделения (может быть слева или справа от anchor)
 let navigationMode = 'word';  // Режим навигации: 'word', 'sentence', 'paragraph'
 let highlightOverlay = null;  // Элемент подсветки
 let translationPopup = null;  // Всплывающее окно с переводом
@@ -628,19 +628,25 @@ async function getTranslation(word) {
 function expandSelectionRight() {
   if (tokenizedText.length === 0) return;
   
-  // Если выделение еще не начато, начинаем с текущего токена
-  if (selectionStartIndex === -1) {
+  // Если выделение еще не начато, устанавливаем якорь
+  if (selectionAnchorIndex === -1) {
     if (currentTokenIndex === -1) {
       currentTokenIndex = 0;
     }
-    selectionStartIndex = currentTokenIndex;
+    selectionAnchorIndex = currentTokenIndex;
     selectionEndIndex = currentTokenIndex;
   }
   
-  // Расширяем выделение вправо
-  selectionEndIndex = Math.min(selectionEndIndex + 1, tokenizedText.length - 1);
-  currentTokenIndex = selectionEndIndex;
+  // Расширяем выделение вправо от якоря
+  if (selectionEndIndex >= selectionAnchorIndex) {
+    // Добавляем слово справа
+    selectionEndIndex = Math.min(selectionEndIndex + 1, tokenizedText.length - 1);
+  } else {
+    // Убираем слово слева (сокращаем выделение к якорю)
+    selectionEndIndex = Math.min(selectionEndIndex + 1, selectionAnchorIndex);
+  }
   
+  currentTokenIndex = selectionEndIndex;
   highlightSelection();
 }
 
@@ -648,31 +654,37 @@ function expandSelectionRight() {
 function expandSelectionLeft() {
   if (tokenizedText.length === 0) return;
   
-  // Если выделение еще не начато, начинаем с текущего токена
-  if (selectionStartIndex === -1) {
+  // Если выделение еще не начато, устанавливаем якорь
+  if (selectionAnchorIndex === -1) {
     if (currentTokenIndex === -1) {
       currentTokenIndex = 0;
     }
-    selectionStartIndex = currentTokenIndex;
+    selectionAnchorIndex = currentTokenIndex;
     selectionEndIndex = currentTokenIndex;
   }
   
-  // Расширяем выделение влево
-  selectionStartIndex = Math.max(selectionStartIndex - 1, 0);
-  currentTokenIndex = selectionStartIndex;
+  // Расширяем выделение влево от якоря
+  if (selectionEndIndex <= selectionAnchorIndex) {
+    // Добавляем слово слева
+    selectionEndIndex = Math.max(selectionEndIndex - 1, 0);
+  } else {
+    // Убираем слово справа (сокращаем выделение к якорю)
+    selectionEndIndex = Math.max(selectionEndIndex - 1, selectionAnchorIndex);
+  }
   
+  currentTokenIndex = selectionEndIndex;
   highlightSelection();
 }
 
 // Очистка выделения
 function clearSelection() {
-  selectionStartIndex = -1;
+  selectionAnchorIndex = -1;
   selectionEndIndex = -1;
 }
 
 // Проверка, есть ли активное выделение
 function hasSelection() {
-  return selectionStartIndex !== -1 && selectionEndIndex !== -1 && selectionStartIndex !== selectionEndIndex;
+  return selectionAnchorIndex !== -1 && selectionEndIndex !== -1 && selectionAnchorIndex !== selectionEndIndex;
 }
 
 // Подсветка выделенного диапазона
@@ -682,8 +694,8 @@ function highlightSelection() {
     return;
   }
   
-  const startIndex = Math.min(selectionStartIndex, selectionEndIndex);
-  const endIndex = Math.max(selectionStartIndex, selectionEndIndex);
+  const startIndex = Math.min(selectionAnchorIndex, selectionEndIndex);
+  const endIndex = Math.max(selectionAnchorIndex, selectionEndIndex);
   
   // Находим текстовые узлы
   const textNodes = [];
@@ -773,8 +785,8 @@ function getSelectedText() {
     return '';
   }
   
-  const startIndex = Math.min(selectionStartIndex, selectionEndIndex);
-  const endIndex = Math.max(selectionStartIndex, selectionEndIndex);
+  const startIndex = Math.min(selectionAnchorIndex, selectionEndIndex);
+  const endIndex = Math.max(selectionAnchorIndex, selectionEndIndex);
   
   const selectedTokens = [];
   for (let i = startIndex; i <= endIndex; i++) {
