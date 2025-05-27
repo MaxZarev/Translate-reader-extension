@@ -267,8 +267,8 @@ function handleKeyPress(event) {
       navigatePrevious();
     }
   }
-  // T - показать/скрыть перевод
-  else if (event.key === 't' || event.key === 'T') {
+  // T/Е - показать/скрыть перевод (английская/русская раскладка)
+  else if (event.key === 't' || event.key === 'T' || event.key === 'е' || event.key === 'Е') {
     event.preventDefault(); // Предотвращаем стандартное поведение (например, открытие новой вкладки)
     toggleTranslation();
   }
@@ -281,16 +281,12 @@ function handleKeyPress(event) {
     event.preventDefault();
     switchNavigationMode('sentence');
   }
-  // Переключение режимов навигации
-  else if (event.key === '`' || event.key === '~') {
+  // Переключение режимов навигации (backtick/ё для английской/русской раскладки)
+  else if (event.key === '`' || event.key === '~' || event.key === 'ё' || event.key === 'Ё') {
     event.preventDefault();
     cycleThroughModes();
   }
-  // S - установить начальную позицию здесь
-  else if (event.key === 's' || event.key === 'S') {
-    event.preventDefault();
-    setStartPositionFromCursor();
-  }
+
   // Escape - очистить выделение
   else if (event.key === 'Escape') {
     event.preventDefault();
@@ -1259,27 +1255,7 @@ function setStartPositionFromClick(event) {
   }
 }
 
-// Установка начальной позиции от текущей позиции курсора (клавиша S)
-function setStartPositionFromCursor() {
-  // Получаем текущее выделение или позицию курсора
-  const selection = window.getSelection();
-  
-  if (selection.rangeCount > 0) {
-    const range = selection.getRangeAt(0);
-    setStartPositionFromRange(range);
-    showStartPositionNotification("Начальная позиция установлена");
-  } else {
-    // Если нет выделения, используем центр экрана
-    const centerX = window.innerWidth / 2;
-    const centerY = window.innerHeight / 2;
-    const range = document.caretRangeFromPoint(centerX, centerY);
-    
-    if (range) {
-      setStartPositionFromRange(range);
-      showStartPositionNotification("Начальная позиция установлена в центре экрана");
-    }
-  }
-}
+
 
 // Установка начальной позиции из диапазона
 function setStartPositionFromRange(range) {
