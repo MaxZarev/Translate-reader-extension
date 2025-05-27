@@ -1,9 +1,14 @@
 // Основные переменные
 let articleText = null;       // Основной текст страницы
 let tokenizedText = [];       // Текст, разбитый на токены (слова/выражения)
+let sentences = [];           // Массив предложений
+// Убрали массив абзацев - используем только слова и предложения
 let currentTokenIndex = -1;   // Индекс текущего выделенного токена
+let currentSentenceIndex = -1; // Индекс текущего предложения
+// Убрали индекс абзаца
 let selectionStartIndex = -1; // Начальный индекс выделения (для множественного выделения)
 let selectionEndIndex = -1;   // Конечный индекс выделения
+let navigationMode = 'word';  // Режим навигации: 'word', 'sentence', 'paragraph'
 let highlightOverlay = null;  // Элемент подсветки
 let translationPopup = null;  // Всплывающее окно с переводом
 let initialized = false;      // Флаг инициализации
@@ -57,6 +62,10 @@ function initializeReader() {
       // Токенизируем текст
       tokenizedText = tokenizeText(articleText);
       console.log(`Translate Reader: Найдено ${tokenizedText.length} токенов`);
+      
+      // Парсим предложения
+      sentences = parseSentences(articleText);
+      console.log(`Translate Reader: Найдено ${sentences.length} предложений`);
       
       // Создаем элементы интерфейса
       createHighlightOverlay();
@@ -218,9 +227,9 @@ function handleKeyPress(event) {
       // Shift + стрелка вправо - расширяем выделение
       expandSelectionRight();
     } else {
-      // Обычная стрелка вправо - переходим к следующему слову
+      // Обычная стрелка вправо - переходим к следующему элементу
       clearSelection();
-      highlightNextToken();
+      navigateNext();
     }
   }
   // Стрелка влево - предыдущее слово
@@ -234,9 +243,9 @@ function handleKeyPress(event) {
       // Shift + стрелка влево - расширяем выделение
       expandSelectionLeft();
     } else {
-      // Обычная стрелка влево - переходим к предыдущему слову
+      // Обычная стрелка влево - переходим к предыдущему элементу
       clearSelection();
-      highlightPreviousToken();
+      navigatePrevious();
     }
   }
   // T - показать/скрыть перевод
@@ -244,12 +253,26 @@ function handleKeyPress(event) {
     event.preventDefault(); // Предотвращаем стандартное поведение (например, открытие новой вкладки)
     toggleTranslation();
   }
+  // Переключение режимов навигации
+  else if (event.key === '1') {
+    event.preventDefault();
+    switchNavigationMode('word');
+  }
+  else if (event.key === '2') {
+    event.preventDefault();
+    switchNavigationMode('sentence');
+  }
+  // Переключение режимов навигации
+  else if (event.key === '`' || event.key === '~') {
+    event.preventDefault();
+    cycleThroughModes();
+  }
   // Escape - очистить выделение
   else if (event.key === 'Escape') {
     event.preventDefault();
     hideTranslationPopup();
     clearSelection();
-    highlightCurrentToken();
+    clearHighlightOverlays();
   }
 }
 
@@ -319,15 +342,11 @@ function highlightCurrentToken() {
           throw new Error('Получен некорректный прямоугольник');
         }
         
-        // Устанавливаем позицию и размеры элемента подсветки
-        highlightOverlay.style.left = `${rect.left + window.scrollX}px`;
-        highlightOverlay.style.top = `${rect.top + window.scrollY}px`;
-        highlightOverlay.style.width = `${rect.width}px`;
-        highlightOverlay.style.height = `${rect.height}px`;
-        highlightOverlay.style.display = 'block';
+        // Очищаем предыдущие элементы подсветки
+        clearHighlightOverlays();
         
-        // Убираем класс множественного выделения для одного слова
-        highlightOverlay.classList.remove('multi-selection');
+        // Создаем элемент подсветки для одного слова
+        createHighlightForRect(rect, 0);
         
         // Всегда прокручиваем страницу так, чтобы слово было в центре экрана
         scrollToElement(rect);
@@ -355,20 +374,13 @@ function highlightCurrentToken() {
       
       const rect = range.getBoundingClientRect();
       
-              highlightOverlay.style.left = `${rect.left + window.scrollX}px`;
-        highlightOverlay.style.top = `${rect.top + window.scrollY}px`;
-        highlightOverlay.style.width = `${rect.width}px`;
-        highlightOverlay.style.height = `${rect.height}px`;
-        highlightOverlay.style.display = 'block';
-        
-        // Добавляем класс для множественного выделения
-        if (hasSelection()) {
-          highlightOverlay.classList.add('multi-selection');
-        } else {
-          highlightOverlay.classList.remove('multi-selection');
-        }
-        
-        scrollToElement(rect);
+      // Очищаем предыдущие элементы подсветки
+      clearHighlightOverlays();
+      
+      // Создаем элемент подсветки для запасного варианта
+      createHighlightForRect(rect, 0);
+      
+      scrollToElement(rect);
       
       // Обновляем текущий индекс токена
       const nearestToken = findNearestToken(fallbackOffset);
@@ -377,10 +389,10 @@ function highlightCurrentToken() {
       }
     } catch (error) {
       console.error('Translate Reader: Не удалось использовать запасной вариант', error);
-      highlightOverlay.style.display = 'none';
+      clearHighlightOverlays();
     }
   } else if (!nodeFound) {
-    highlightOverlay.style.display = 'none';
+    clearHighlightOverlays();
   }
 }
 
@@ -672,16 +684,23 @@ function highlightSelection() {
       range.setStart(startNode, startOffset);
       range.setEnd(endNode, endOffset);
       
-      const rect = range.getBoundingClientRect();
+      // Получаем все прямоугольники для многострочного выделения
+      const rects = range.getClientRects();
       
-      if (rect.width > 0 && rect.height > 0) {
-        highlightOverlay.style.left = `${rect.left + window.scrollX}px`;
-        highlightOverlay.style.top = `${rect.top + window.scrollY}px`;
-        highlightOverlay.style.width = `${rect.width}px`;
-        highlightOverlay.style.height = `${rect.height}px`;
-        highlightOverlay.style.display = 'block';
+      if (rects.length > 0) {
+        // Очищаем предыдущие элементы подсветки
+        clearHighlightOverlays();
         
-        scrollToElement(rect);
+        // Создаем элемент подсветки для каждой строки
+        for (let i = 0; i < rects.length; i++) {
+          const rect = rects[i];
+          if (rect.width > 0 && rect.height > 0) {
+            createHighlightForRect(rect, i);
+          }
+        }
+        
+        // Прокручиваем к первому прямоугольнику
+        scrollToElement(rects[0]);
       }
     } catch (error) {
       console.error('Translate Reader: Ошибка при выделении диапазона', error);
@@ -695,9 +714,19 @@ function highlightSelection() {
 // Получение выделенного текста
 function getSelectedText() {
   if (!hasSelection()) {
-    // Если нет выделения, возвращаем текущее слово
-    if (currentTokenIndex !== -1 && tokenizedText[currentTokenIndex]) {
-      return tokenizedText[currentTokenIndex].text;
+    // Если нет выделения, возвращаем текущий элемент в зависимости от режима
+    switch (navigationMode) {
+      case 'word':
+        if (currentTokenIndex !== -1 && tokenizedText[currentTokenIndex]) {
+          return tokenizedText[currentTokenIndex].text;
+        }
+        break;
+      case 'sentence':
+        if (currentSentenceIndex !== -1 && sentences[currentSentenceIndex]) {
+          return sentences[currentSentenceIndex].text;
+        }
+        break;
+
     }
     return '';
   }
@@ -718,4 +747,364 @@ function getSelectedText() {
 // Скрыть окно перевода
 function hideTranslationPopup() {
   translationPopup.style.display = 'none';
+}
+
+// Функция для разбора текста на предложения
+function parseSentences(element) {
+  const text = element.textContent;
+  
+  // Улучшенный регекс для разбиения на предложения
+  // Учитываем сокращения, числа с точками, инициалы
+  const sentenceRegex = /(?<!\b(?:Mr|Mrs|Ms|Dr|Prof|Inc|Ltd|Co|vs|etc|i\.e|e\.g|a\.m|p\.m|U\.S|U\.K)\.)(?<!\b\d)(?<!\b[A-ZА-Я])[.!?]+(?=\s+[A-ZА-ЯЁ]|\s*$)/g;
+  
+  const sentenceArray = [];
+  let lastIndex = 0;
+  let match;
+  
+  while ((match = sentenceRegex.exec(text)) !== null) {
+    const endIndex = match.index + match[0].length;
+    const sentence = text.substring(lastIndex, endIndex).trim();
+    
+    if (sentence.length > 10) { // Минимальная длина предложения
+      // Находим начало предложения (пропускаем пробелы)
+      let startIndex = lastIndex;
+      while (startIndex < text.length && /\s/.test(text[startIndex])) {
+        startIndex++;
+      }
+      
+      sentenceArray.push({
+        text: sentence,
+        startIndex: startIndex,
+        endIndex: endIndex
+      });
+    }
+    lastIndex = endIndex;
+  }
+  
+  // Добавляем последнее предложение, если оно есть
+  if (lastIndex < text.length) {
+    let startIndex = lastIndex;
+    while (startIndex < text.length && /\s/.test(text[startIndex])) {
+      startIndex++;
+    }
+    
+    const lastSentence = text.substring(startIndex).trim();
+    if (lastSentence.length > 10) {
+      sentenceArray.push({
+        text: lastSentence,
+        startIndex: startIndex,
+        endIndex: text.length
+      });
+    }
+  }
+  
+  return sentenceArray;
+}
+
+
+
+// Переключение режима навигации
+function switchNavigationMode(mode) {
+  const previousMode = navigationMode;
+  navigationMode = mode;
+  clearSelection();
+  
+  // Сохраняем позицию при переключении между режимами
+  preservePositionOnModeSwitch(previousMode, mode);
+  
+  // Показываем уведомление о смене режима
+  showModeNotification(mode);
+  
+  // Подсвечиваем текущий элемент в новом режиме
+  highlightCurrentItem();
+  
+  console.log(`Translate Reader: Режим навигации изменен на ${mode}`);
+}
+
+// Показать уведомление о смене режима
+function showModeNotification(mode) {
+  const modeInfo = {
+    'word': { name: 'Слова', color: '#ffc107', icon: '🔤' },
+    'sentence': { name: 'Предложения', color: '#28a745', icon: '📝' }
+  };
+  
+  const modes = ['word', 'sentence'];
+  const currentIndex = modes.indexOf(mode);
+  const info = modeInfo[mode];
+  
+  const notification = document.createElement('div');
+  notification.innerHTML = `
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <span style="font-size: 16px;">${info.icon}</span>
+      <span>Режим: ${info.name}</span>
+      <span style="font-size: 12px; opacity: 0.8;">(${currentIndex + 1}/2)</span>
+    </div>
+  `;
+  notification.style.cssText = `
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background-color: ${info.color};
+    color: white;
+    padding: 10px 15px;
+    border-radius: 4px;
+    font-size: 14px;
+    z-index: 10001;
+    transition: opacity 0.3s;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  `;
+  
+  document.body.appendChild(notification);
+  
+  // Убираем уведомление через 2 секунды
+  setTimeout(() => {
+    notification.style.opacity = '0';
+    setTimeout(() => {
+      notification.remove();
+    }, 300);
+  }, 2000);
+}
+
+// Универсальная навигация вперед
+function navigateNext() {
+  switch (navigationMode) {
+    case 'word':
+      highlightNextToken();
+      break;
+    case 'sentence':
+      highlightNextSentence();
+      break;
+
+  }
+}
+
+// Универсальная навигация назад
+function navigatePrevious() {
+  switch (navigationMode) {
+    case 'word':
+      highlightPreviousToken();
+      break;
+    case 'sentence':
+      highlightPreviousSentence();
+      break;
+
+  }
+}
+
+// Подсветка текущего элемента в зависимости от режима
+function highlightCurrentItem() {
+  switch (navigationMode) {
+    case 'word':
+      highlightCurrentToken();
+      break;
+    case 'sentence':
+      highlightCurrentSentence();
+      break;
+
+  }
+}
+
+// Навигация по предложениям
+function highlightNextSentence() {
+  if (sentences.length === 0) return;
+  
+  currentSentenceIndex = Math.min(currentSentenceIndex + 1, sentences.length - 1);
+  highlightCurrentSentence();
+}
+
+function highlightPreviousSentence() {
+  if (sentences.length === 0) return;
+  
+  if (currentSentenceIndex === -1) {
+    currentSentenceIndex = 0;
+  } else {
+    currentSentenceIndex = Math.max(currentSentenceIndex - 1, 0);
+  }
+  
+  highlightCurrentSentence();
+}
+
+function highlightCurrentSentence() {
+  if (currentSentenceIndex === -1 || !sentences[currentSentenceIndex]) return;
+  
+  const sentence = sentences[currentSentenceIndex];
+  highlightTextRange(sentence.startIndex, sentence.endIndex);
+}
+
+
+
+// Универсальная функция для подсветки диапазона текста
+function highlightTextRange(startIndex, endIndex) {
+  const textNodes = [];
+  getTextNodes(articleText, textNodes);
+  
+  let currentTextLength = 0;
+  let startNode = null, endNode = null;
+  let startOffset = 0, endOffset = 0;
+  
+  // Ищем начальный и конечный узлы
+  for (const node of textNodes) {
+    const nodeTextLength = node.textContent.length;
+    
+    // Проверяем начальную позицию
+    if (!startNode && startIndex >= currentTextLength && startIndex < currentTextLength + nodeTextLength) {
+      startNode = node;
+      startOffset = startIndex - currentTextLength;
+    }
+    
+    // Проверяем конечную позицию
+    if (!endNode && endIndex > currentTextLength && endIndex <= currentTextLength + nodeTextLength) {
+      endNode = node;
+      endOffset = endIndex - currentTextLength;
+    }
+    
+    currentTextLength += nodeTextLength;
+    
+    if (startNode && endNode) break;
+  }
+  
+  if (startNode && endNode) {
+    try {
+      const range = document.createRange();
+      range.setStart(startNode, startOffset);
+      range.setEnd(endNode, endOffset);
+      
+      // Получаем все прямоугольники для многострочного текста
+      const rects = range.getClientRects();
+      
+      if (rects.length > 0) {
+        // Очищаем предыдущие элементы подсветки
+        clearHighlightOverlays();
+        
+        // Создаем элемент подсветки для каждой строки
+        for (let i = 0; i < rects.length; i++) {
+          const rect = rects[i];
+          if (rect.width > 0 && rect.height > 0) {
+            createHighlightForRect(rect, i);
+          }
+        }
+        
+        // Прокручиваем к первому прямоугольнику
+        scrollToElement(rects[0]);
+      }
+    } catch (error) {
+      console.error('Translate Reader: Ошибка при подсветке диапазона', error);
+    }
+  }
+}
+
+// Создание элемента подсветки для конкретного прямоугольника
+function createHighlightForRect(rect, index) {
+  const overlay = document.createElement('div');
+  overlay.className = 'translate-reader-highlight-line';
+  overlay.id = `translate-reader-highlight-${index}`;
+  
+  overlay.style.cssText = `
+    position: absolute;
+    left: ${rect.left + window.scrollX}px;
+    top: ${rect.top + window.scrollY}px;
+    width: ${rect.width}px;
+    height: ${rect.height}px;
+    background-color: rgba(255, 255, 0, 0.3);
+    pointer-events: none;
+    z-index: 9999;
+    border-radius: 2px;
+    transition: all 0.2s ease;
+    display: block;
+  `;
+  
+  // Устанавливаем стиль в зависимости от режима навигации
+  if (hasSelection()) {
+    overlay.style.backgroundColor = 'rgba(0, 123, 255, 0.3)';
+    overlay.style.border = '2px solid rgba(0, 123, 255, 0.6)';
+  } else if (navigationMode === 'sentence') {
+    overlay.style.backgroundColor = 'rgba(40, 167, 69, 0.3)';
+    overlay.style.border = '2px solid rgba(40, 167, 69, 0.6)';
+    overlay.style.borderRadius = '4px';
+  }
+  
+  document.body.appendChild(overlay);
+}
+
+// Очистка всех элементов подсветки
+function clearHighlightOverlays() {
+  // Удаляем старые элементы подсветки строк
+  const existingOverlays = document.querySelectorAll('.translate-reader-highlight-line');
+  existingOverlays.forEach(overlay => overlay.remove());
+  
+  // Скрываем основной элемент подсветки
+  if (highlightOverlay) {
+    highlightOverlay.style.display = 'none';
+  }
+}
+
+// Циклическое переключение режимов навигации
+function cycleThroughModes() {
+  const modes = ['word', 'sentence'];
+  const currentIndex = modes.indexOf(navigationMode);
+  const nextIndex = (currentIndex + 1) % modes.length;
+  const nextMode = modes[nextIndex];
+  
+  switchNavigationMode(nextMode);
+}
+
+// Сохранение позиции при переключении между режимами
+function preservePositionOnModeSwitch(previousMode, newMode) {
+  if (previousMode === newMode) return;
+  
+  if (previousMode === 'word' && newMode === 'sentence') {
+    // Переход от слова к предложению
+    if (currentTokenIndex !== -1) {
+      // Находим предложение, содержащее текущее слово
+      const currentToken = tokenizedText[currentTokenIndex];
+      if (currentToken) {
+        const sentenceIndex = findSentenceContainingPosition(currentToken.index);
+        if (sentenceIndex !== -1) {
+          currentSentenceIndex = sentenceIndex;
+        } else {
+          currentSentenceIndex = 0;
+        }
+      }
+    } else {
+      currentSentenceIndex = 0;
+    }
+  } else if (previousMode === 'sentence' && newMode === 'word') {
+    // Переход от предложения к слову
+    if (currentSentenceIndex !== -1) {
+      // Находим первое слово в текущем предложении
+      const currentSentence = sentences[currentSentenceIndex];
+      if (currentSentence) {
+        const tokenIndex = findFirstTokenInSentence(currentSentence);
+        if (tokenIndex !== -1) {
+          currentTokenIndex = tokenIndex;
+        } else {
+          currentTokenIndex = 0;
+        }
+      }
+    } else {
+      currentTokenIndex = 0;
+    }
+  }
+}
+
+// Найти предложение, содержащее указанную позицию
+function findSentenceContainingPosition(position) {
+  for (let i = 0; i < sentences.length; i++) {
+    const sentence = sentences[i];
+    if (position >= sentence.startIndex && position <= sentence.endIndex) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+// Найти первый токен в предложении
+function findFirstTokenInSentence(sentence) {
+  for (let i = 0; i < tokenizedText.length; i++) {
+    const token = tokenizedText[i];
+    if (token.index >= sentence.startIndex && token.index < sentence.endIndex) {
+      return i;
+    }
+  }
+  return -1;
 } 
