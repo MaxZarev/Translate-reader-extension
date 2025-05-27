@@ -46,6 +46,10 @@ async function translateWord(word) {
     return translationCache[word];
   }
   
+  // Определяем языки для перевода
+  const sourceLang = 'en'; // Исходный язык - английский
+  const targetLang = 'ru'; // Целевой язык - русский
+  
   // Используем бесплатный API для перевода
   // Если у вас есть API ключ для Google Translate, используйте его
   if (API_KEY) {
@@ -61,8 +65,8 @@ async function translateWord(word) {
         },
         body: JSON.stringify({
           q: word,
-          source: 'auto',
-          target: 'ru', // Язык перевода (русский)
+          source: sourceLang,
+          target: targetLang,
           format: 'text'
         })
       });
@@ -85,7 +89,7 @@ async function translateWord(word) {
   // Используем бесплатный API-сервис как запасной вариант
   console.log('Translate Reader: Используем MyMemory API');
   try {
-    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(word)}&langpair=auto|ru`;
+    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(word)}&langpair=${sourceLang}|${targetLang}`;
     
     const response = await fetch(url);
     const data = await response.json();
