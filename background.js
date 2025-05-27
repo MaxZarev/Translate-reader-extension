@@ -1,7 +1,7 @@
 // Фоновый скрипт для расширения Translate Reader
 
 // Информация о расширении
-const EXTENSION_VERSION = '2.0.0';
+const EXTENSION_VERSION = '2.1.0';
 const EXTENSION_REPO = 'https://github.com/MaxZarev/translate-reader-extension';
 
 // API ключ будет загружаться из настроек
