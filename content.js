@@ -13,6 +13,7 @@ let highlightOverlay = null;  // Элемент подсветки
 let translationPopup = null;  // Всплывающее окно с переводом
 let initialized = false;      // Флаг инициализации
 let ctrlJumpWords = 5;        // Количество слов для прыжка с Ctrl+стрелки
+let extensionEnabled = true;  // Флаг включения/выключения расширения
 
 // Инициализация расширения при загрузке страницы
 function initOnLoad() {
@@ -208,13 +209,19 @@ function createTranslationPopup() {
   document.body.appendChild(translationPopup);
 }
 
-// Добавление обработчиков клавиатуры
+// Добавление обработчиков клавиатуры и мыши
 function addKeyboardListeners() {
   document.addEventListener('keydown', handleKeyPress);
+  document.addEventListener('click', handleClick);
 }
 
 // Обработка нажатий клавиш
 function handleKeyPress(event) {
+  // Игнорируем событие, если расширение выключено
+  if (!extensionEnabled) {
+    return;
+  }
+  
   // Игнорируем событие, если пользователь вводит в поле ввода
   if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA' || event.target.isContentEditable) {
     return;
@@ -278,6 +285,11 @@ function handleKeyPress(event) {
   else if (event.key === '`' || event.key === '~') {
     event.preventDefault();
     cycleThroughModes();
+  }
+  // S - установить начальную позицию здесь
+  else if (event.key === 's' || event.key === 'S') {
+    event.preventDefault();
+    setStartPositionFromCursor();
   }
   // Escape - очистить выделение
   else if (event.key === 'Escape') {
@@ -502,7 +514,25 @@ function toggleTranslation() {
     `;
     
     // Позиционируем всплывающее окно рядом с подсветкой
-    const highlightRect = highlightOverlay.getBoundingClientRect();
+    let highlightRect = null;
+    
+    // Ищем активный элемент подсветки
+    const activeHighlight = document.querySelector('.translate-reader-highlight-line');
+    if (activeHighlight && activeHighlight.style.display !== 'none') {
+      highlightRect = activeHighlight.getBoundingClientRect();
+    } else if (highlightOverlay && highlightOverlay.style.display !== 'none') {
+      highlightRect = highlightOverlay.getBoundingClientRect();
+    }
+    
+    // Если не найден активный элемент подсветки, используем центр экрана
+    if (!highlightRect || (highlightRect.width === 0 && highlightRect.height === 0)) {
+      highlightRect = {
+        left: window.innerWidth / 2 - 100,
+        right: window.innerWidth / 2 + 100,
+        top: window.innerHeight / 2 - 50,
+        bottom: window.innerHeight / 2 + 50
+      };
+    }
     
     // Проверяем, достаточно ли места под подсветкой
     const spaceBelow = window.innerHeight - highlightRect.bottom;
@@ -1048,6 +1078,11 @@ function clearHighlightOverlays() {
   if (highlightOverlay) {
     highlightOverlay.style.display = 'none';
   }
+  
+  // Скрываем окно перевода, если оно открыто
+  if (translationPopup && translationPopup.style.display === 'block') {
+    hideTranslationPopup();
+  }
 }
 
 // Циклическое переключение режимов навигации
@@ -1162,10 +1197,198 @@ function loadSettings() {
       
       const settings = data.settings || {};
       ctrlJumpWords = settings.ctrlJumpWords || 5;
+      extensionEnabled = settings.extensionEnabled !== undefined ? settings.extensionEnabled : true;
       
-      console.log(`Translate Reader: Загружены настройки, прыжок на ${ctrlJumpWords} слов`);
+      console.log(`Translate Reader: Загружены настройки, прыжок на ${ctrlJumpWords} слов, расширение ${extensionEnabled ? 'включено' : 'выключено'}`);
     });
   } catch (error) {
     console.log('Translate Reader: Ошибка загрузки настроек, используем значения по умолчанию');
   }
-} 
+}
+
+// Обработчик клика для установки начальной позиции
+function handleClick(event) {
+  // Игнорируем событие, если расширение выключено
+  if (!extensionEnabled) {
+    return;
+  }
+  
+  // Проверяем, что нажата клавиша Ctrl/Cmd во время клика
+  if (event.ctrlKey || event.metaKey) {
+    // Проверяем, что клик не по элементам интерфейса расширения
+    const target = event.target;
+    if (target.id === 'translate-reader-popup' || 
+        target.closest('#translate-reader-popup') ||
+        target.className.includes('translate-reader')) {
+      return; // Не обрабатываем клики по элементам расширения
+    }
+    
+    event.preventDefault();
+    setStartPositionFromClick(event);
+  }
+}
+
+// Установка начальной позиции по клику
+function setStartPositionFromClick(event) {
+  const clickX = event.clientX;
+  const clickY = event.clientY;
+  
+  // Находим элемент под курсором
+  const elementUnderCursor = document.elementFromPoint(clickX, clickY);
+  
+  if (elementUnderCursor && articleText.contains(elementUnderCursor)) {
+    // Создаем диапазон для определения позиции клика в тексте
+    const range = document.caretRangeFromPoint(clickX, clickY);
+    
+    if (range) {
+      setStartPositionFromRange(range);
+      showStartPositionNotification("Начальная позиция установлена по клику");
+    }
+  }
+}
+
+// Установка начальной позиции от текущей позиции курсора (клавиша S)
+function setStartPositionFromCursor() {
+  // Получаем текущее выделение или позицию курсора
+  const selection = window.getSelection();
+  
+  if (selection.rangeCount > 0) {
+    const range = selection.getRangeAt(0);
+    setStartPositionFromRange(range);
+    showStartPositionNotification("Начальная позиция установлена");
+  } else {
+    // Если нет выделения, используем центр экрана
+    const centerX = window.innerWidth / 2;
+    const centerY = window.innerHeight / 2;
+    const range = document.caretRangeFromPoint(centerX, centerY);
+    
+    if (range) {
+      setStartPositionFromRange(range);
+      showStartPositionNotification("Начальная позиция установлена в центре экрана");
+    }
+  }
+}
+
+// Установка начальной позиции из диапазона
+function setStartPositionFromRange(range) {
+  try {
+    // Получаем позицию в тексте
+    const textPosition = getTextPositionFromRange(range);
+    
+    if (textPosition !== -1) {
+      // Находим ближайшее слово к этой позиции
+      const nearestTokenIndex = findNearestToken(textPosition);
+      
+      if (nearestTokenIndex !== -1) {
+        currentTokenIndex = nearestTokenIndex;
+        
+        // Если мы в режиме предложений, находим соответствующее предложение
+        if (navigationMode === 'sentence') {
+          const token = tokenizedText[currentTokenIndex];
+          if (token) {
+            const sentenceIndex = findSentenceContainingPosition(token.index);
+            if (sentenceIndex !== -1) {
+              currentSentenceIndex = sentenceIndex;
+            }
+          }
+        }
+        
+        // Скрываем окно перевода перед изменением позиции
+        hideTranslationPopup();
+        
+        // Очищаем выделение и подсвечиваем новую позицию
+        clearSelection();
+        highlightCurrentItem();
+        
+        console.log(`Translate Reader: Начальная позиция установлена на слово ${currentTokenIndex + 1}`);
+      }
+    }
+  } catch (error) {
+    console.error('Translate Reader: Ошибка при установке начальной позиции', error);
+  }
+}
+
+// Получение позиции в тексте из диапазона
+function getTextPositionFromRange(range) {
+  try {
+    // Создаем диапазон от начала articleText до позиции клика
+    const fullRange = document.createRange();
+    fullRange.setStart(articleText, 0);
+    fullRange.setEnd(range.startContainer, range.startOffset);
+    
+    // Получаем текст до позиции клика
+    const textBeforeClick = fullRange.toString();
+    
+    return textBeforeClick.length;
+  } catch (error) {
+    console.error('Translate Reader: Ошибка получения позиции текста', error);
+    return -1;
+  }
+}
+
+// Показать уведомление об установке начальной позиции
+function showStartPositionNotification(message) {
+  const notification = document.createElement('div');
+  notification.innerHTML = `
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <span style="font-size: 16px;">📍</span>
+      <span>${message}</span>
+    </div>
+  `;
+  notification.style.cssText = `
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #2196f3;
+    color: white;
+    padding: 10px 15px;
+    border-radius: 4px;
+    font-size: 14px;
+    z-index: 10001;
+    transition: opacity 0.3s;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  `;
+  
+  document.body.appendChild(notification);
+  
+  // Убираем уведомление через 3 секунды
+  setTimeout(() => {
+    notification.style.opacity = '0';
+    setTimeout(() => {
+      notification.remove();
+    }, 300);
+  }, 3000);
+}
+
+// Обработчик сообщений от popup
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.action === 'toggleExtension') {
+    extensionEnabled = message.enabled;
+    
+    if (!extensionEnabled) {
+      // Если расширение выключается, очищаем все элементы интерфейса
+      clearHighlightOverlays();
+      hideTranslationPopup();
+      clearSelection();
+      
+      // Скрываем кнопку активации
+      const activationButton = document.querySelector('.translate-reader-button');
+      if (activationButton) {
+        activationButton.style.display = 'none';
+      }
+      
+      console.log('Translate Reader: Расширение выключено');
+    } else {
+      // Если расширение включается, показываем кнопку активации
+      const activationButton = document.querySelector('.translate-reader-button');
+      if (activationButton) {
+        activationButton.style.display = 'block';
+      }
+      
+      console.log('Translate Reader: Расширение включено');
+    }
+    
+    sendResponse({ success: true });
+  }
+}); 

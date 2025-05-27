@@ -6,10 +6,12 @@ const defaultSettings = {
   highlightColor: '#FFFF00',
   highlightOpacity: 0.3,
   autoTranslate: true,
-  ctrlJumpWords: 5
+  ctrlJumpWords: 5,
+  extensionEnabled: true
 };
 
 // Элементы настроек
+const toggleExtensionBtn = document.getElementById('toggle-extension');
 const targetLanguageSelect = document.getElementById('target-language');
 const highlightColorInput = document.getElementById('highlight-color');
 const highlightOpacityInput = document.getElementById('highlight-opacity');
@@ -25,6 +27,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const settings = data.settings || defaultSettings;
     
     // Заполняем элементы формы значениями из настроек
+    const extensionEnabled = settings.extensionEnabled !== undefined ? settings.extensionEnabled : defaultSettings.extensionEnabled;
+    updateToggleButton(extensionEnabled);
+    
     targetLanguageSelect.value = settings.targetLanguage || defaultSettings.targetLanguage;
     highlightColorInput.value = settings.highlightColor || defaultSettings.highlightColor;
     highlightOpacityInput.value = settings.highlightOpacity || defaultSettings.highlightOpacity;
@@ -47,7 +52,8 @@ saveButton.addEventListener('click', () => {
     highlightColor: highlightColorInput.value,
     highlightOpacity: parseFloat(highlightOpacityInput.value),
     ctrlJumpWords: parseInt(ctrlJumpWordsInput.value),
-    autoTranslate: autoTranslateCheckbox.checked
+    autoTranslate: autoTranslateCheckbox.checked,
+    extensionEnabled: toggleExtensionBtn.classList.contains('active')
   };
   
   // Сохраняем настройки в хранилище
@@ -78,4 +84,48 @@ saveButton.addEventListener('click', () => {
       }, 500);
     }, 2000);
   });
-}); 
+});
+
+// Обработчик кнопки переключения расширения
+toggleExtensionBtn.addEventListener('click', () => {
+  const isActive = toggleExtensionBtn.classList.contains('active');
+  updateToggleButton(!isActive);
+  
+  // Сразу сохраняем изменение состояния
+  const currentSettings = {
+    extensionEnabled: !isActive
+  };
+  
+  chrome.storage.sync.get('settings', (data) => {
+    const settings = { ...data.settings, ...currentSettings };
+    chrome.storage.sync.set({ settings }, () => {
+      // Отправляем сообщение в content script о изменении состояния
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0]) {
+          chrome.tabs.sendMessage(tabs[0].id, {
+            action: 'toggleExtension',
+            enabled: !isActive
+          });
+        }
+      });
+    });
+  });
+});
+
+// Функция обновления внешнего вида кнопки переключения
+function updateToggleButton(enabled) {
+  const icon = toggleExtensionBtn.querySelector('.toggle-icon');
+  const text = toggleExtensionBtn.querySelector('.toggle-text');
+  
+  if (enabled) {
+    toggleExtensionBtn.classList.remove('inactive');
+    toggleExtensionBtn.classList.add('active');
+    icon.textContent = '🟢';
+    text.textContent = 'Расширение включено';
+  } else {
+    toggleExtensionBtn.classList.remove('active');
+    toggleExtensionBtn.classList.add('inactive');
+    icon.textContent = '🔴';
+    text.textContent = 'Расширение выключено';
+  }
+} 
