@@ -1,13 +1,16 @@
 // Фоновый скрипт для расширения Translate Reader
 
-// API для перевода (используем Google Translate API)
-const API_KEY = 'AIzaSyAJMWo2ssvxks-q3lDAUNpSKUy6MiQnypk'; // Требуется ваш API-ключ для Google Translate
+// API ключ будет загружаться из настроек
+let API_KEY = '';
 
 // Кэш переводов для уменьшения количества запросов к API
 const translationCache = {};
 
 // Логирование запуска расширения
 console.log('Translate Reader: Фоновый скрипт инициализирован');
+
+// Загружаем API ключ из настроек при запуске
+loadApiKey();
 
 // Обработчик сообщений от контент-скрипта
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -112,10 +115,31 @@ async function translateWord(word) {
   return word;
 }
 
+// Функция для загрузки API ключа из настроек
+async function loadApiKey() {
+  try {
+    const result = await chrome.storage.sync.get('settings');
+    if (result.settings && result.settings.googleApiKey) {
+      API_KEY = result.settings.googleApiKey;
+      console.log('Translate Reader: API ключ загружен из настроек');
+    } else {
+      console.log('Translate Reader: API ключ не найден в настройках');
+    }
+  } catch (error) {
+    console.error('Translate Reader: Ошибка загрузки API ключа:', error);
+  }
+}
+
 // Управление локальным хранилищем для сохранения настроек
 chrome.storage.onChanged.addListener((changes, namespace) => {
   if (namespace === 'sync' && changes.settings) {
     // Обновляем настройки при их изменении
     console.log('Translate Reader: Настройки обновлены:', changes.settings.newValue);
+    
+    // Обновляем API ключ, если он изменился
+    if (changes.settings.newValue && changes.settings.newValue.googleApiKey !== undefined) {
+      API_KEY = changes.settings.newValue.googleApiKey || '';
+      console.log('Translate Reader: API ключ обновлен');
+    }
   }
 }); 

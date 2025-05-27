@@ -46,11 +46,19 @@ h2 {
 }
 
 .setting select,
-.setting input[type="color"] {
+.setting input[type="color"],
+.setting input[type="password"],
+.setting input[type="number"] {
   width: 120px;
   padding: 5px;
   border: 1px solid #ddd;
   border-radius: 4px;
+}
+
+.setting input[type="password"] {
+  width: 140px;
+  font-family: monospace;
+  font-size: 12px;
 }
 
 .setting input[type="range"] {

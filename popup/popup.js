@@ -7,7 +7,8 @@ const defaultSettings = {
   highlightOpacity: 0.3,
   autoTranslate: true,
   ctrlJumpWords: 5,
-  extensionEnabled: true
+  extensionEnabled: true,
+  googleApiKey: ''
 };
 
 // Элементы настроек
@@ -17,6 +18,7 @@ const highlightColorInput = document.getElementById('highlight-color');
 const highlightOpacityInput = document.getElementById('highlight-opacity');
 const opacityValueSpan = document.getElementById('opacity-value');
 const ctrlJumpWordsInput = document.getElementById('ctrl-jump-words');
+const googleApiKeyInput = document.getElementById('google-api-key');
 const autoTranslateCheckbox = document.getElementById('auto-translate');
 const saveButton = document.getElementById('save-btn');
 
@@ -35,6 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
     highlightOpacityInput.value = settings.highlightOpacity || defaultSettings.highlightOpacity;
     opacityValueSpan.textContent = settings.highlightOpacity || defaultSettings.highlightOpacity;
     ctrlJumpWordsInput.value = settings.ctrlJumpWords || defaultSettings.ctrlJumpWords;
+    googleApiKeyInput.value = settings.googleApiKey || defaultSettings.googleApiKey;
     autoTranslateCheckbox.checked = settings.autoTranslate !== undefined ? settings.autoTranslate : defaultSettings.autoTranslate;
   });
 });
@@ -52,6 +55,7 @@ saveButton.addEventListener('click', () => {
     highlightColor: highlightColorInput.value,
     highlightOpacity: parseFloat(highlightOpacityInput.value),
     ctrlJumpWords: parseInt(ctrlJumpWordsInput.value),
+    googleApiKey: googleApiKeyInput.value.trim(),
     autoTranslate: autoTranslateCheckbox.checked,
     extensionEnabled: toggleExtensionBtn.classList.contains('active')
   };

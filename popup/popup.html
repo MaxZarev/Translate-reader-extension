@@ -47,6 +47,14 @@
         <input type="number" id="ctrl-jump-words" min="1" max="20" value="5">
       </div>
       
+      <div class="setting">
+        <label for="google-api-key">Google Translate API ключ:</label>
+        <input type="password" id="google-api-key" placeholder="Введите API ключ">
+        <small style="display: block; color: #666; font-size: 11px; margin-top: 3px;">
+          <a href="https://console.cloud.google.com/apis/credentials" target="_blank">Получить ключ</a>
+        </small>
+      </div>
+      
       <div class="setting checkbox">
         <input type="checkbox" id="auto-translate" checked>
         <label for="auto-translate">Автоматически показывать перевод</label>
@@ -60,7 +68,7 @@
         <li><strong>←</strong> - Предыдущий элемент</li>
         <li><strong>Ctrl + →/←</strong> - Прыжок на несколько слов</li>
         <li><strong>Shift + →/←</strong> - Выделить несколько слов</li>
-        <li><strong>T/Е</strong> - Показать/скрыть перевод</li>
+        <li><strong>T/Е</strong> - Показать/скрыть перевод (или перевести выделенный текст)</li>
         <li><strong>Ctrl + клик</strong> - Начать чтение отсюда</li>
         <li><strong>`/Ё</strong> - Переключить режим (циклично)</li>
         <li><strong>1</strong> - Режим слов (желтый)</li>

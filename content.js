@@ -14,6 +14,8 @@ let translationPopup = null;  // Всплывающее окно с перево
 let initialized = false;      // Флаг инициализации
 let ctrlJumpWords = 5;        // Количество слов для прыжка с Ctrl+стрелки
 let extensionEnabled = true;  // Флаг включения/выключения расширения
+let domObserver = null;       // Наблюдатель за изменениями DOM
+let lastContentHash = '';     // Хеш последнего контента для отслеживания изменений
 
 // Инициализация расширения при загрузке страницы
 function initOnLoad() {
@@ -46,6 +48,18 @@ function initOnLoad() {
 
 // Запускаем инициализацию
 initOnLoad();
+
+// Функция для создания простого хеша строки
+function simpleHash(str) {
+  let hash = 0;
+  if (str.length === 0) return hash;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Преобразуем в 32-битное число
+  }
+  return hash.toString();
+}
 
 // Основная функция инициализации
 function initializeReader() {
@@ -82,6 +96,12 @@ function initializeReader() {
       // Создаем кнопку активации
       createActivationButton();
       
+      // Запускаем наблюдение за изменениями DOM
+      startDOMObserver();
+      
+      // Сохраняем хеш текущего контента
+      lastContentHash = simpleHash(articleText.textContent);
+      
       initialized = true;
       console.log('Translate Reader: Инициализация завершена');
     } else {
@@ -105,6 +125,132 @@ function createActivationButton() {
   });
   
   document.body.appendChild(button);
+}
+
+// Запуск наблюдения за изменениями DOM
+function startDOMObserver() {
+  if (domObserver) {
+    domObserver.disconnect();
+  }
+  
+  domObserver = new MutationObserver((mutations) => {
+    // Проверяем, есть ли значительные изменения в DOM
+    let hasSignificantChanges = false;
+    
+    for (const mutation of mutations) {
+      // Игнорируем изменения в элементах расширения
+      if (mutation.target.id && mutation.target.id.includes('translate-reader')) {
+        continue;
+      }
+      
+      // Проверяем добавление/удаление узлов
+      if (mutation.type === 'childList' && 
+          (mutation.addedNodes.length > 0 || mutation.removedNodes.length > 0)) {
+        
+        // Проверяем, есть ли среди добавленных/удаленных узлов текстовые элементы
+        const hasTextNodes = [...mutation.addedNodes, ...mutation.removedNodes].some(node => {
+          return node.nodeType === Node.TEXT_NODE || 
+                 (node.nodeType === Node.ELEMENT_NODE && node.textContent.trim().length > 50);
+        });
+        
+        if (hasTextNodes) {
+          hasSignificantChanges = true;
+          break;
+        }
+      }
+    }
+    
+    if (hasSignificantChanges) {
+      // Задержка для завершения всех изменений DOM
+      setTimeout(checkForContentChanges, 500);
+    }
+  });
+  
+  // Наблюдаем за изменениями в body
+  domObserver.observe(document.body, {
+    childList: true,
+    subtree: true,
+    attributes: false,
+    characterData: true
+  });
+  
+  console.log('Translate Reader: Наблюдение за DOM запущено');
+}
+
+// Проверка изменений контента и переинициализация при необходимости
+function checkForContentChanges() {
+  if (!extensionEnabled || !initialized) return;
+  
+  try {
+    // Находим новый основной контент
+    const newArticleText = findMainContent();
+    
+    if (newArticleText && newArticleText !== articleText) {
+      const newContentHash = simpleHash(newArticleText.textContent);
+      
+      // Если контент значительно изменился
+      if (newContentHash !== lastContentHash) {
+        console.log('Translate Reader: Обнаружены изменения контента, переинициализация...');
+        
+        // Очищаем текущее состояние
+        clearHighlightOverlays();
+        hideTranslationPopup();
+        clearSelection();
+        
+        // Обновляем данные
+        articleText = newArticleText;
+        tokenizedText = tokenizeText(articleText);
+        sentences = parseSentences(articleText);
+        lastContentHash = newContentHash;
+        
+        // Сбрасываем позиции
+        currentTokenIndex = -1;
+        currentSentenceIndex = -1;
+        
+        console.log(`Translate Reader: Переинициализация завершена. Найдено ${tokenizedText.length} токенов, ${sentences.length} предложений`);
+        
+        // Показываем уведомление о переинициализации
+        showContentChangeNotification();
+      }
+    }
+  } catch (error) {
+    console.error('Translate Reader: Ошибка при проверке изменений контента', error);
+  }
+}
+
+// Показать уведомление об изменении контента
+function showContentChangeNotification() {
+  const notification = document.createElement('div');
+  notification.innerHTML = `
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <span style="font-size: 16px;">🔄</span>
+      <span>Контент обновлен</span>
+    </div>
+  `;
+  notification.style.cssText = `
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #ff9800;
+    color: white;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 13px;
+    z-index: 10001;
+    transition: opacity 0.3s;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  `;
+  
+  document.body.appendChild(notification);
+  
+  // Убираем уведомление через 2 секунды
+  setTimeout(() => {
+    notification.style.opacity = '0';
+    setTimeout(() => {
+      notification.remove();
+    }, 300);
+  }, 2000);
 }
 
 // Функция для нахождения основного контента страницы
@@ -213,6 +359,7 @@ function createTranslationPopup() {
 function addKeyboardListeners() {
   document.addEventListener('keydown', handleKeyPress);
   document.addEventListener('click', handleClick);
+  document.addEventListener('selectionchange', handleSelectionChange);
 }
 
 // Обработка нажатий клавиш
@@ -270,7 +417,16 @@ function handleKeyPress(event) {
   // T/Е - показать/скрыть перевод (английская/русская раскладка)
   else if (event.key === 't' || event.key === 'T' || event.key === 'е' || event.key === 'Е') {
     event.preventDefault(); // Предотвращаем стандартное поведение (например, открытие новой вкладки)
-    toggleTranslation();
+    
+    // Проверяем, есть ли выделенный мышкой текст
+    const selectedText = window.getSelection().toString().trim();
+    if (selectedText) {
+      // Переводим выделенный мышкой текст
+      translateSelectedText(selectedText);
+    } else {
+      // Переводим текущий элемент навигации
+      toggleTranslation();
+    }
   }
   // Переключение режимов навигации
   else if (event.key === '1') {
@@ -482,6 +638,65 @@ function getVisibility(rect) {
     return 'partially-visible-bottom';
   } else {
     return 'not-visible';
+  }
+}
+
+// Перевод выделенного мышкой текста
+function translateSelectedText(selectedText) {
+  // Получаем позицию выделенного текста
+  const selection = window.getSelection();
+  if (selection.rangeCount === 0) return;
+  
+  const range = selection.getRangeAt(0);
+  const rect = range.getBoundingClientRect();
+  
+  // Если перевод уже отображается, скрываем его
+  if (translationPopup.style.display === 'block') {
+    hideTranslationPopup();
+    return;
+  }
+  
+  console.log(`Translate Reader: Переводим выделенный текст: "${selectedText}"`);
+  
+  // Получаем перевод выделенного текста
+  getTranslation(selectedText).then(translation => {
+    // Устанавливаем текст перевода
+    translationPopup.innerHTML = `
+      <div><b>${selectedText}</b></div>
+      <div>${translation}</div>
+    `;
+    
+    // Позиционируем всплывающее окно рядом с выделенным текстом
+    positionPopupNearSelection(rect);
+    
+    // Показываем всплывающее окно
+    translationPopup.style.display = 'block';
+    
+    // Проверяем, что всплывающее окно полностью видно после показа
+    setTimeout(() => {
+      const popupRect = translationPopup.getBoundingClientRect();
+      ensurePopupVisible(popupRect);
+    }, 0);
+  });
+}
+
+// Позиционирование popup рядом с выделенным текстом
+function positionPopupNearSelection(selectionRect) {
+  // Проверяем, достаточно ли места под выделением
+  const spaceBelow = window.innerHeight - selectionRect.bottom;
+  const spaceAbove = selectionRect.top;
+  
+  // Оцениваем размер всплывающего окна (примерно)
+  const estimatedPopupHeight = 60; // Минимальная высота в пикселях
+  
+  if (spaceBelow >= estimatedPopupHeight || spaceBelow >= spaceAbove) {
+    // Размещаем под выделением
+    translationPopup.style.left = `${selectionRect.left + window.scrollX}px`;
+    translationPopup.style.top = `${selectionRect.bottom + window.scrollY + 5}px`;
+  } else {
+    // Размещаем над выделением
+    translationPopup.style.left = `${selectionRect.left + window.scrollX}px`;
+    translationPopup.style.top = `${selectionRect.top + window.scrollY - 5 - estimatedPopupHeight}px`;
   }
 }
 
@@ -1214,6 +1429,33 @@ function loadSettings() {
   }
 }
 
+// Обработчик изменения выделения текста
+function handleSelectionChange() {
+  // Игнорируем событие, если расширение выключено
+  if (!extensionEnabled) {
+    return;
+  }
+  
+  // Небольшая задержка, чтобы дать время завершиться выделению
+  setTimeout(() => {
+    const selection = window.getSelection();
+    const selectedText = selection.toString().trim();
+    
+    // Если выделение очищено или изменилось, скрываем popup перевода
+    // (кроме случаев, когда popup уже скрыт)
+    if (!selectedText && translationPopup.style.display === 'block') {
+      // Проверяем, что это не наше собственное выделение от расширения
+      const isOurSelection = selection.rangeCount > 0 && 
+        selection.getRangeAt(0).startContainer.closest && 
+        selection.getRangeAt(0).startContainer.closest('.translate-reader-highlight-line, #translate-reader-highlight');
+      
+      if (!isOurSelection) {
+        hideTranslationPopup();
+      }
+    }
+  }, 100);
+}
+
 // Обработчик клика для установки начальной позиции
 function handleClick(event) {
   // Игнорируем событие, если расширение выключено
@@ -1360,6 +1602,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       hideTranslationPopup();
       clearSelection();
       
+      // Останавливаем наблюдение за DOM
+      if (domObserver) {
+        domObserver.disconnect();
+        domObserver = null;
+      }
+      
       // Скрываем кнопку активации
       const activationButton = document.querySelector('.translate-reader-button');
       if (activationButton) {
@@ -1372,6 +1620,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       const activationButton = document.querySelector('.translate-reader-button');
       if (activationButton) {
         activationButton.style.display = 'block';
+      }
+      
+      // Запускаем наблюдение за DOM, если оно не активно
+      if (initialized && !domObserver) {
+        startDOMObserver();
       }
       
       console.log('Translate Reader: Расширение включено');
